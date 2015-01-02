@@ -1,0 +1,195 @@
+<html>
+  <head>
+    <script src='http://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js'></script>
+    <script>
+      var CLARIFICATION_PENALTY=10;
+      var names = [];
+      var namesIndex=0;
+      var mode = 0;
+      var modes = ['STEMMING','EDITING','PHONETIC'];
+      var modeColors = ['#F5D6D6','#EBF5D6','#ADD6EB'];
+      var t0;
+
+      function init()
+      {
+        mode=0;
+        userId=0;
+        $('#controls').css({'background':modeColors[mode], 'padding':'50px', 'width':'66%'});
+        $('#namesSelect').css({'width':'75%'});
+        enableControls();
+      }
+
+      function keyup()
+      {
+        if($('#fninput').val() == 'First Name' ||
+          $('#fninput').val() === '' ||
+          $('#lninput').val() == 'Last Name' ||
+          $('#lninput').val() === '')
+        {
+          $('#searchinput').attr('disabled', 'disabled');
+        }
+        else if($('#fninput').val() != 'fninput' &&
+          $('#fninput').val() !== '' &&
+          $('#lninput').val() != 'lninput' &&
+          $('#lninput').val() !== '')
+        {
+          $("#searchinput").removeAttr('disabled');
+        }
+      }
+
+      function focusFunction(input, value)
+      {
+        if(input.value==value){
+          input.value='';
+        }
+      }
+
+      function blurFunction(input, value)
+      {
+        if(input.value==='')
+        {
+          input.value = value;
+        }
+      }
+
+      function getNames(callback)
+      {
+        $.get("https://localhost:9080/names", fillNames).error(ajaxError);
+
+        function fillNames(data, status, jqXHR)
+        {
+          console.log('names ...');
+          console.log(data);
+          data.patients.every(
+            function(x)
+            {
+              names.push(x);
+              return true;
+            }
+          );
+
+          callback();
+        }
+      }
+
+      function changeFile()
+      {
+        t0 = Date.now();
+        $('#audioControls').attr('src', names[namesIndex].file);
+      }
+
+      function notPresent()
+      {
+        var answer = {
+                        observed:'notPresent',
+                        actual:names[namesIndex]._id,
+                        selected:'',
+                        deltat:Date.now()-t0,
+                        userId:userId,
+                        present:names[namesIndex].present,
+                      };
+
+        $.post('https://localhost:9080/answers', answer, posted('notPresent')).error(ajaxError);
+      }
+
+      function clarification()
+      {
+        disableControls();
+        countdown(CLARIFICATION_PENALTY);
+      }
+
+      function countdown(x)
+      {
+        if(x>0)
+        {
+          $('#timerButton').attr('value',x);
+          setTimeout(function(){countdown(x-1);}, 1000);
+        }
+        else
+        {
+          $('#timerButton').removeAttr('hidden');
+          enableControls();
+
+          var deltat = (Date.now()-t0)/1000;
+
+          var answer = {
+            observed:'clarification',
+            actual:names[namesIndex]._id,
+            selected:'',
+            deltat:deltat,
+            userId:userId,
+            present:names[namesIndex].present,
+          };
+
+          $.post('https://localhost:9080/answers', answer, posted('clarification')).error(ajaxError);
+        }
+      }
+
+      function disableControls()
+      {
+        $('#fninput').attr('disabled','disabled');
+        $('#lninput').attr('disabled','disabled');
+        $('#searchinput').attr('disabled','disabled');
+        $('#notPresentButton').attr('disabled','disabled');
+        $('#selectedButton').attr('disabled','disabled');
+        $('#clarificationButton').attr('disabled','disabled');
+        $('clarificationButton').attr('disabled','disabled');
+        $('#audioControls').removeAttr('controls');
+        $('#timerButton').show();
+      }
+
+      function enableControls()
+      {
+        $('#fninput').removeAttr('disabled','disabled');
+        $('#lninput').removeAttr('disabled','disabled');
+        $('#searchinput').removeAttr('disabled','disabled');
+        $('#notPresentButton').removeAttr('disabled','disabled');
+        $('#selectedButton').removeAttr('disabled','disabled');
+        $('#clarificationButton').removeAttr('disabled','disabled');
+        $('clarificationButton').removeAttr('disabled','disabled');
+        $('#audioControls').attr('controls','controls');
+        $('#timerButton').hide();
+      }
+
+      function selected()
+      {
+        var answer = {
+          observed:'selected',
+          actual:names[namesIndex]._id,
+          selected:'',
+          deltat:Date.now()-t0,
+          userId:userId,
+          present:names[namesIndex].present,
+        };
+
+        $.post('https://localhost:9080/answers', answer, posted('notPresent')).error(ajaxError);
+      }
+
+      function ajaxError(e)
+      {
+        console.log(e);
+      }
+
+      function posted(x)
+      {
+        console.log('posted:' + x);
+      }
+    </script>
+  <head>
+  <body onLoad="init();getNames(changeFile)">
+    <div id='audioPlayerDiv'>
+      <input id='timerButton' type="button" value='' disabled hidden/>
+      <audio controls id='audioControls' src=''/>
+    </div><br><br>
+    <div id='controls'>
+      <select id='namesSelect' multiple size='8'>
+      </select><br>
+      <input id='fninput' type='text' value='First Name' size='50' onkeyup='keyup();' onfocus='focusFunction(this, this.value);' onblur='blurFunction(this, "First Name")'/>
+      <input id='lninput' type='text' value='Last Name' size='50' onkeyup='keyup();' onfocus='focusFunction(this, this.value);' onblur='blurFunction(this, "Last Name")'/>
+      <input id='searchinput' type='button' value='Search' disabled/><br><br>
+      <input id='notPresentButton' type='button' value='not present' onclick='notPresent()'/>
+      <input id='selectedButton' type='button' value='selected' onclick='selected()'/>
+      <input id='clarificationButton' type='button' value='clarification' onclick='clarification()'/>
+    </div>
+  </body>
+</html>
