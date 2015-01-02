@@ -6,13 +6,14 @@
       var names = [];
       var namesIndex=0;
       var mode = 0;
-      var modes = ['STEMMING','EDITING','PHONETIC'];
+      var modesRun=0;
+      var modes = ['stemming','jaro_winkler','phonetic'];
       var modeColors = ['#F5D6D6','#EBF5D6','#ADD6EB'];
       var t0;
 
       function init()
       {
-        mode=0;
+        mode=1;
         userId=0;
         $('#controls').css({'background':modeColors[mode], 'padding':'50px', 'width':'66%'});
         $('#namesSelect').css({'width':'75%'});
@@ -58,8 +59,6 @@
 
         function fillNames(data, status, jqXHR)
         {
-          console.log('names ...');
-          console.log(data);
           data.patients.every(
             function(x)
             {
@@ -72,24 +71,24 @@
         }
       }
 
-      function changeFile()
-      {
-        t0 = Date.now();
-        $('#audioControls').attr('src', names[namesIndex].file);
-      }
-
       function notPresent()
       {
+        var deltat=Date.now()-t0;
+
         var answer = {
+                        mode:modes[mode],
                         observed:'notPresent',
                         actual:names[namesIndex]._id,
                         selected:'',
-                        deltat:Date.now()-t0,
+                        deltat:deltat,
                         userId:userId,
                         present:names[namesIndex].present,
                       };
 
         $.post('https://localhost:9080/answers', answer, posted('notPresent')).error(ajaxError);
+
+        clearNames();
+        changeFile();
       }
 
       function clarification()
@@ -113,6 +112,7 @@
           var deltat = (Date.now()-t0)/1000;
 
           var answer = {
+            mode:modes[mode],
             observed:'clarification',
             actual:names[namesIndex]._id,
             selected:'',
@@ -122,6 +122,8 @@
           };
 
           $.post('https://localhost:9080/answers', answer, posted('clarification')).error(ajaxError);
+          clearNames();
+          changeFile();
         }
       }
 
@@ -153,16 +155,83 @@
 
       function selected()
       {
+        var selectedName = $('#namesSelect').find(':selected').val();
+
+        if(!selectedName)
+        {
+          alert('no name selected');
+          return;
+        }
+
         var answer = {
+          mode:modes[mode],
           observed:'selected',
           actual:names[namesIndex]._id,
-          selected:'',
+          selected:selectedName,
           deltat:Date.now()-t0,
           userId:userId,
           present:names[namesIndex].present,
         };
 
-        $.post('https://localhost:9080/answers', answer, posted('notPresent')).error(ajaxError);
+        $.post('https://localhost:9080/answers', answer, posted('selected')).error(ajaxError);
+        clearNames();
+        changeFile();
+      }
+
+      function changeFile()
+      {
+        t0 = Date.now();
+        namesIndex++;
+        if(namesIndex >= names.length)
+        {
+          namesIndex=0;
+          changeMode();
+          return;
+        }
+
+        $('audioControls').attr('src',names[namesIndex].file);
+      }
+
+      function changeMode()
+      {
+        modesRun++;
+
+        if(modesRun>=3)
+        {
+          alert('thank you for completing the study');
+          disableControls();
+          return;
+        }
+
+        mode=++mode%3;
+        $('#controls').css({'background':modeColors[mode], 'padding':'50px', 'width':'66%'});
+      }
+
+      function search()
+      {
+        clearNames();
+
+        var path='https://localhost:9080' +
+          '/' + modes[mode] +
+          '/' + $('#fninput').val() +
+          '/' + $('#lninput').val();
+
+        $.get(path, fillNames).error(ajaxError);
+
+        function fillNames(data, status, jqXHR)
+        {
+          data.patients.every(
+            function(x)
+            {
+              $('#namesSelect').append('<option value=' + x._id + '>' + x.first + ' ' + x.last + '</option>');
+            }
+          );
+        }
+      }
+
+      function clearNames()
+      {
+        $('#namesSelect').find('option').remove();
       }
 
       function ajaxError(e)
@@ -186,10 +255,10 @@
       </select><br>
       <input id='fninput' type='text' value='First Name' size='50' onkeyup='keyup();' onfocus='focusFunction(this, this.value);' onblur='blurFunction(this, "First Name")'/>
       <input id='lninput' type='text' value='Last Name' size='50' onkeyup='keyup();' onfocus='focusFunction(this, this.value);' onblur='blurFunction(this, "Last Name")'/>
-      <input id='searchinput' type='button' value='Search' disabled/><br><br>
-      <input id='notPresentButton' type='button' value='not present' onclick='notPresent()'/>
-      <input id='selectedButton' type='button' value='selected' onclick='selected()'/>
-      <input id='clarificationButton' type='button' value='clarification' onclick='clarification()'/>
+      <input id='searchinput' type='button' value='Search' disabled onclick='search();'/><br><br>
+      <input id='notPresentButton' type='button' value='not present' onclick='notPresent();'/>
+      <input id='selectedButton' type='button' value='selected' onclick='selected();'/>
+      <input id='clarificationButton' type='button' value='clarification' onclick='clarification();'/>
     </div>
   </body>
 </html>
