@@ -17,6 +17,7 @@
         userId=0;
         $('#controls').css({'background':modeColors[mode], 'padding':'50px', 'width':'66%'});
         $('#namesSelect').css({'width':'75%'});
+        $('#strategyLabel').attr('value',modes[mode]);
         enableControls();
       }
 
@@ -67,6 +68,7 @@
             }
           );
 
+          $('#progressBox').attr('value', 'Ready');
           callback();
         }
       }
@@ -180,6 +182,7 @@
 
       function changeFile()
       {
+        console.log('changeFile: ' + names[namesIndex].file);
         t0 = Date.now();
         namesIndex++;
         if(namesIndex >= names.length)
@@ -189,7 +192,7 @@
           return;
         }
 
-        $('audioControls').attr('src',names[namesIndex].file);
+        $('#audioControls').attr('src',names[namesIndex].file);
       }
 
       function changeMode()
@@ -205,6 +208,7 @@
 
         mode=++mode%3;
         $('#controls').css({'background':modeColors[mode], 'padding':'50px', 'width':'66%'});
+        $('#strategyLabel').attr('value',modes[mode]);
       }
 
       function search()
@@ -246,6 +250,9 @@
     </script>
   <head>
   <body onLoad="init();getNames(changeFile)">
+    <div id='loadingDiv'>
+      <input id='progressBox' type='text' disabled value='loading...'/>
+    </div>
     <div id='audioPlayerDiv'>
       <input id='timerButton' type="button" value='' disabled hidden/>
       <audio controls id='audioControls' src=''/>
@@ -253,6 +260,7 @@
     <div id='controls'>
       <select id='namesSelect' multiple size='8'>
       </select><br>
+      <h1>mode:<h6/><input id='strategyLabel' type='text' value disabled><br><br>
       <input id='fninput' type='text' value='First Name' size='50' onkeyup='keyup();' onfocus='focusFunction(this, this.value);' onblur='blurFunction(this, "First Name")'/>
       <input id='lninput' type='text' value='Last Name' size='50' onkeyup='keyup();' onfocus='focusFunction(this, this.value);' onblur='blurFunction(this, "Last Name")'/>
       <input id='searchinput' type='button' value='Search' disabled onclick='search();'/><br><br>
