@@ -3,21 +3,30 @@
     <script src='http://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js'></script>
     <script>
       var CLARIFICATION_PENALTY=10;
+      var userId=0;
       var names = [];
       var namesIndex=0;
-      var mode = 0;
-      var modesRun=0;
-      var modes = ['stemming','jaro_winkler','phonetic'];
+      var mode = 0;//first case
+      var modesRun = 0;
+      var sequence = 1;
+      var modes = ['jaro_winkler', 'phonetic', 'stemming'];//sequence 1
+      //var modes = ['jaro_winkler', 'stemming', 'phonetic'];//sequence 2
+
+      //var modes = ['stemming','jaro_winkler','phonetic'];//sequence 3
+      //var modes = ['stemming','phonetic','jaro_winkler'];//sequence 4
+
+      //var modes = ['phonetic', 'jaro_winkler', 'stemming'];//sequence 5
+      //var modes = ['phonetic', 'stemming','jaro_winkler'];//sequence 6
+
       var modeColors = ['#F5D6D6','#EBF5D6','#ADD6EB'];
       var t0;
 
       function init()
       {
-        mode=1;
+        mode=0;
         userId=0;
         $('#controls').css({'background':modeColors[mode], 'padding':'50px', 'width':'66%'});
         $('#namesSelect').css({'width':'75%'});
-        $('#strategyLabel').attr('value',modes[mode]);
         enableControls();
       }
 
@@ -70,6 +79,8 @@
 
           $('#progressBox').attr('value', 'Ready');
           callback();
+
+          console.log(names);
         }
       }
 
@@ -79,12 +90,13 @@
 
         var answer = {
                         mode:modes[mode],
+                        sequence:sequence,
                         observed:'notPresent',
-                        actual:names[namesIndex]._id,
+                        actual:names[namesIndex-1]._id,
                         selected:'',
                         deltat:deltat,
                         userId:userId,
-                        present:names[namesIndex].present,
+                        present:names[namesIndex-1].present,
                       };
 
         $.post('https://localhost:9080/answers', answer, posted('notPresent')).error(ajaxError);
@@ -115,12 +127,13 @@
 
           var answer = {
             mode:modes[mode],
+            sequence:sequence,
             observed:'clarification',
-            actual:names[namesIndex]._id,
+            actual:names[namesIndex-1]._id,
             selected:'',
             deltat:deltat,
             userId:userId,
-            present:names[namesIndex].present,
+            present:names[namesIndex-1].present,
           };
 
           $.post('https://localhost:9080/answers', answer, posted('clarification')).error(ajaxError);
@@ -167,12 +180,13 @@
 
         var answer = {
           mode:modes[mode],
+          sequence:sequence,
           observed:'selected',
-          actual:names[namesIndex]._id,
+          actual:names[namesIndex-1]._id,
           selected:selectedName,
           deltat:Date.now()-t0,
           userId:userId,
-          present:names[namesIndex].present,
+          present:names[namesIndex-1].present,
         };
 
         $.post('https://localhost:9080/answers', answer, posted('selected')).error(ajaxError);
@@ -182,17 +196,19 @@
 
       function changeFile()
       {
-        console.log('changeFile: ' + names[namesIndex].file);
         t0 = Date.now();
-        namesIndex++;
+
+        $('#fninput').val('First Name');
+        $('#lninput').val('Last Name');
+
         if(namesIndex >= names.length)
         {
           namesIndex=0;
           changeMode();
-          return;
         }
 
         $('#audioControls').attr('src',names[namesIndex].file);
+        namesIndex++;
       }
 
       function changeMode()
@@ -206,13 +222,22 @@
           return;
         }
 
-        mode=++mode%3;
+        mode++;
+        console.log('mode from: ' + modes[mode-1] + ' mode to: ' + modes[mode]);
+        names = shuffle(names);
+
         $('#controls').css({'background':modeColors[mode], 'padding':'50px', 'width':'66%'});
-        $('#strategyLabel').attr('value',modes[mode]);
       }
+
+      function shuffle(o){ //v1.0
+        for(var j, x, i = o.length; i; j = Math.floor(Math.random()*i), x = o[--i], o[i] = o[j], o[j] = x);
+        return o;
+      }//http://stackoverflow.com/questions/6274339/how-can-i-shuffle-an-array-in-javascript
 
       function search()
       {
+        $('#selectedButton').removeAttr('disabled');
+
         clearNames();
 
         var path='https://localhost:9080' +
@@ -224,12 +249,21 @@
 
         function fillNames(data, status, jqXHR)
         {
-          data.patients.every(
-            function(x)
-            {
-              $('#namesSelect').append('<option value=' + x._id + '>' + x.first + ' ' + x.last + '</option>');
-            }
-          );
+          if(data.patients.length < 1)
+          {
+            $('#namesSelect').append('<option value="no results">no results</option>');
+            $('#selectedButton').attr('disabled','disabled');
+          }
+          else
+          {
+            data.patients.every(
+              function(x)
+              {
+                $('#namesSelect').append('<option value=' + x._id + '>' + x.first + ' ' + x.last + '</option>');
+                return true;
+              }
+            );
+          }
         }
       }
 
@@ -247,6 +281,7 @@
       {
         console.log('posted:' + x);
       }
+
     </script>
   <head>
   <body onLoad="init();getNames(changeFile)">
@@ -260,7 +295,6 @@
     <div id='controls'>
       <select id='namesSelect' multiple size='8'>
       </select><br>
-      <h1>mode:<h6/><input id='strategyLabel' type='text' value disabled><br><br>
       <input id='fninput' type='text' value='First Name' size='50' onkeyup='keyup();' onfocus='focusFunction(this, this.value);' onblur='blurFunction(this, "First Name")'/>
       <input id='lninput' type='text' value='Last Name' size='50' onkeyup='keyup();' onfocus='focusFunction(this, this.value);' onblur='blurFunction(this, "Last Name")'/>
       <input id='searchinput' type='button' value='Search' disabled onclick='search();'/><br><br>
